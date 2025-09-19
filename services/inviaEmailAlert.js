@@ -1,14 +1,19 @@
-const axios = require('axios');
+const axios = require("axios");
 
-// Inserisci qui l'URL del tuo Google Apps Script Webhook
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxDNXZVLliqu9TVLAV5s0EsXW5fzTfHNRTjcE4dt4Dn9wDxfF4zwLHpPsGE--MGHEwnlQ/exec";
+// 🔑 URL viene letto dalle variabili d’ambiente
+const APPS_SCRIPT_URL = process.env.APPS_SCRIPT_URL;
 
 async function inviaEmailAlert(oggetto, messaggio) {
+  if (!APPS_SCRIPT_URL) {
+    console.error("⚠️ Variabile APPS_SCRIPT_URL non configurata");
+    return;
+  }
+
   try {
     const res = await axios.post(APPS_SCRIPT_URL, {
       tipo: "alert",
       oggetto,
-      messaggio
+      messaggio,
     });
     console.log("📧 Email inviata:", res.data);
   } catch (err) {
@@ -17,11 +22,11 @@ async function inviaEmailAlert(oggetto, messaggio) {
 }
 
 async function inviaMessaggioProprietario(testo) {
-  // Se vuoi attivare anche l'alert via WhatsApp, inserisci qui client.sendMessage(...)
+  // Puoi collegarlo al client WhatsApp se vuoi, per ora è placeholder
   console.log("🔔 Alert anche su WhatsApp (placeholder):", testo);
 }
 
 module.exports = {
   inviaEmailAlert,
-  inviaMessaggioProprietario
+  inviaMessaggioProprietario,
 };

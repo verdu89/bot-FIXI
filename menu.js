@@ -4,8 +4,7 @@ const { CHIUSURA_FORZATA } = require("../utils/dateUtils");
 function inviaMenuPrincipale(to) {
   const messaggio = `
 🌙 *I nostri uffici sono chiusi*  
-io sono *FIXI, l'assistente AI 🤖*. 
-Come posso aiutarti?
+ io sono *FIXI l'assistente AI 🤖*, posso aiutarti subito:
 
 1️⃣ Richiedi un preventivo  
 2️⃣ Scopri i prodotti  

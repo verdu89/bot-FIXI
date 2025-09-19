@@ -24,7 +24,7 @@ const dateChiuse = [
   "2026-12-26",
 ];
 
-const CHIUSURA_FORZATA = true;
+const CHIUSURA_FORZATA = false;
 
 function isOrarioLavorativo() {
   if (CHIUSURA_FORZATA) return false;

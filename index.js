@@ -1,4 +1,5 @@
 require("dotenv").config();
+const fs = require("fs"); // 🆕 per log su file
 const { client } = require("./client");
 const { initQueue, safeSendMessage } = require("./queue");
 const { isOrarioLavorativo } = require("./utils/dateUtils");
@@ -12,6 +13,12 @@ const {
   spiegaDomandaIA,
 } = require("./ai-utils");
 const { app, chatManuale } = require("./api");
+
+// 🆕 soglia max età messaggi sincronizzati (default 5 minuti)
+const SYNC_OLD_MSG_MAX_AGE_MS = parseInt(
+  process.env.SYNC_OLD_MSG_MAX_AGE_MS || "300000",
+  10
+);
 
 // Stato runtime
 let utentiInAttesa = {};
@@ -36,13 +43,10 @@ client.on("message", async (msg) => {
     type: msg.type,
   });
 
-  ultimaAttivita[msg.from] = Date.now();
   const from = msg.from;
-  const body = msg.body?.trim().toLowerCase() || "";
-  const utente = utentiInAttesa[from];
 
   // Ignora status
-  if (msg.from === "status@broadcast") {
+  if (from === "status@broadcast") {
     console.log("⚠️ Ignorato messaggio di stato");
     return;
   }
@@ -52,6 +56,31 @@ client.on("message", async (msg) => {
     console.log(`✋ Utente ${from} è in manuale → FIXI non interviene`);
     return;
   }
+
+  // 🆕 ⏱️ Guardia anti-sync: ignora messaggi RECEIVED troppo vecchi
+  const msgTsMs =
+    typeof msg.timestamp === "number" ? msg.timestamp * 1000 : Date.now();
+  const ageMs = Date.now() - msgTsMs;
+  if (ageMs > SYNC_OLD_MSG_MAX_AGE_MS) {
+    const log = `[${new Date().toISOString()}] [IGNORA_SYNC] FROM: ${from} age=${Math.round(
+      ageMs / 1000
+    )}s type=${msg.type}\nBODY: ${String(msg.body || "").slice(0, 200)}\n\n`;
+    try {
+      fs.appendFileSync("log_sync_ignored.txt", log);
+    } catch (e) {
+      console.warn("⚠️ Impossibile scrivere log_sync_ignored.txt:", e.message);
+    }
+    console.log(
+      `⏱️ Ignoro messaggio vecchio (${Math.round(ageMs / 1000)}s) da ${from}`
+    );
+    return;
+  }
+
+  // (spostato qui) aggiorna ultima attività SOLO per messaggi “freschi”
+  ultimaAttivita[from] = Date.now();
+
+  const body = msg.body?.trim().toLowerCase() || "";
+  const utente = utentiInAttesa[from];
 
   // Orario lavorativo → messaggio cortesia solo 1 volta
   if (isOrarioLavorativo()) {

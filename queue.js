@@ -5,6 +5,9 @@ let client = null;
 const sendQueue = [];
 let sending = false;
 
+// tempo massimo di validità dei messaggi in coda (10 minuti)
+const MAX_MSG_AGE = 10 * 60 * 1000;
+
 // inizializza la coda con il client di whatsapp-web.js
 function initQueue(whatsappClient) {
   client = whatsappClient;
@@ -47,7 +50,8 @@ async function safeSendMessage(to, message) {
     );
     return;
   }
-  sendQueue.push({ to, message });
+  // ⏱️ aggiungiamo il timestamp al messaggio
+  sendQueue.push({ to, message, timestamp: Date.now() });
   console.log(`📨 In coda → ${to}. Lunghezza coda: ${sendQueue.length}`);
   if (!sending) processQueue();
 }
@@ -70,6 +74,19 @@ async function processQueue() {
       }
 
       const item = sendQueue[0]; // peek
+
+      // ⏱️ scarto messaggi troppo vecchi
+      if (Date.now() - item.timestamp > MAX_MSG_AGE) {
+        console.warn(
+          `⏱️ Scarto messaggio vecchio (${(
+            (Date.now() - item.timestamp) /
+            1000
+          ).toFixed(0)}s) per ${item.to}`
+        );
+        sendQueue.shift();
+        continue;
+      }
+
       let success = false;
       let attempts = 0;
 

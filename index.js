@@ -16,7 +16,7 @@ const { app, chatManuale } = require("./api");
 
 // 🆕 soglia max età messaggi sincronizzati (default 5 minuti)
 const SYNC_OLD_MSG_MAX_AGE_MS = parseInt(
-  process.env.SYNC_OLD_MSG_MAX_AGE_MS || "300000",
+  process.env.SYNC_OLD_MSG_MAX_AGE_MS || "60000",
   10
 );
 
@@ -61,6 +61,8 @@ client.on("message", async (msg) => {
   const msgTsMs =
     typeof msg.timestamp === "number" ? msg.timestamp * 1000 : Date.now();
   const ageMs = Date.now() - msgTsMs;
+
+  // ⛔ Ignora se troppo vecchio rispetto alla finestra SYNC
   if (ageMs > SYNC_OLD_MSG_MAX_AGE_MS) {
     const log = `[${new Date().toISOString()}] [IGNORA_SYNC] FROM: ${from} age=${Math.round(
       ageMs / 1000
@@ -72,6 +74,16 @@ client.on("message", async (msg) => {
     }
     console.log(
       `⏱️ Ignoro messaggio vecchio (${Math.round(ageMs / 1000)}s) da ${from}`
+    );
+    return;
+  }
+
+  // 🆕 ⛔ Ignora se il messaggio è più vecchio del primo avvio del bot
+  if (msgTsMs < primoAvvio - 10000) {
+    console.log(
+      `⏱️ Ignoro messaggio con timestamp precedente al primo avvio: ${new Date(
+        msgTsMs
+      ).toISOString()}`
     );
     return;
   }

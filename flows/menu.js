@@ -12,7 +12,8 @@ Come posso aiutarti?
 3️⃣ Assistenza post-vendita  
 4️⃣ Dove siamo (sedi e orari)  
 
-👉 Rispondi con il numero corrispondente.
+ℹ️ scrivi *annulla* per interrompere.
+
   `.trim();
 
   return safeSendMessage(to, messaggio);

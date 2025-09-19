@@ -295,7 +295,7 @@ client.on("message_create", (msg) => {
 setInterval(() => {
   console.log("♻️ Pulizia flag cortesia");
   for (const numero in haRicevutoCortesia) {
-    if (Date.now() - haRicevutoCortesia[numero] > 3 * 24 * 60 * 60 * 1000) {
+    if (Date.now() - haRicevutoCortesia[numero] > 7 * 24 * 60 * 60 * 1000) {
       console.log(`🧹 Reset cortesia per ${numero}`);
       delete haRicevutoCortesia[numero];
     }

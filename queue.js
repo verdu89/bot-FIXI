@@ -96,6 +96,23 @@ async function processQueue() {
           await delay(Math.random() * 1200 + 800); // piccola attesa anti-ban
           await client.sendMessage(item.to, item.message);
           console.log(`✅ Messaggio inviato a ${item.to}`);
+
+          // 🆕 Segna la chat come NON letta, così resta il pallino verde
+          try {
+            const chat = await client.getChatById(item.to);
+            if (chat) {
+              await chat.markUnread();
+              console.log(
+                `📍 Chat con ${item.to} segnata come NON letta dopo risposta bot`
+              );
+            }
+          } catch (e) {
+            console.warn(
+              `⚠️ Impossibile marcare come NON letta la chat con ${item.to}:`,
+              e.message
+            );
+          }
+
           sendQueue.shift(); // rimuovi SOLO dopo successo
           success = true;
         } catch (err) {

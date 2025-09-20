@@ -3,8 +3,8 @@ const { delay } = require("../utils/dateUtils");
 const { CHIUSURA_FORZATA } = require("../utils/dateUtils");
 function inviaMenuPrincipale(to) {
   const messaggio = `
-🌙 *I nostri uffici sono chiusi*  
-io sono *FIXI, l'assistente AI 🤖*. 
+🕒 *I nostri uffici sono chiusi*  
+io sono *FIXI 🤖, il tuo assistente AI*. 
 Come posso aiutarti?
 
 1️⃣ Richiedi un preventivo  
@@ -12,7 +12,7 @@ Come posso aiutarti?
 3️⃣ Assistenza post-vendita  
 4️⃣ Dove siamo (sedi e orari)  
 
-ℹ️ scrivi *annulla* per interrompere.
+ℹ️ Scrivi *annulla* per interrompere.
 
   `.trim();
 

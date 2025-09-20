@@ -3,7 +3,7 @@ const { delay } = require("../utils/dateUtils");
 const { CHIUSURA_FORZATA } = require("../utils/dateUtils");
 function inviaMenuPrincipale(to) {
   const messaggio = `
-🕒 *I nostri uffici sono chiusi*  
+⏰ *I nostri uffici sono chiusi*  
 io sono *FIXI 🤖, il tuo assistente AI*. 
 Come posso aiutarti?
 

@@ -35,47 +35,31 @@ app.post("/richiedi-recensione", async (req, res) => {
   const { numero } = req.body;
 
   try {
+    if (!numero) {
+      return res.status(400).json({ ok: false, error: "Numero mancante" });
+    }
+
+    // 🔎 normalizza numero (usa la tua funzione o regex qui)
     const { normalizzaNumero } = require("./flows/preventivo");
     const num = normalizzaNumero(numero);
-    const chatId = num + "@c.us";
 
-    const messaggio = `Gentile cliente, grazie per aver scelto la nostra azienda! 
-                      Ci farebbe piacere ricevere una sua recensione. 
-                      👉 Può lasciarla qui: https://maps.app.goo.gl/UbEqci5Pw7EJXkUx8`;
+    const messaggio = `🌟 Gentile cliente,
+    grazie di cuore per averci scelto! La tua opinione per noi è preziosa 💙
 
-    try {
-      // safeSendMessage ora deve ritornare un esito vero/falso
-      const result = await safeSendMessage(chatId, messaggio);
+    Se ti sei trovato bene con il nostro servizio, ci farebbe davvero piacere ricevere una tua recensione positiva ✍️✨
 
-      if (!result.ok) {
-        const log = `[${new Date().toISOString()}] [RECENSIONE FALLITA] TO: ${num}\n${
-          result.error
-        }\n\n`;
-        fs.appendFileSync("log_recensioni.txt", log);
+    👉 Lascia la tua recensione qui: https://maps.app.goo.gl/UbEqci5Pw7EJXkUx8
 
-        return res.json({
-          ok: false,
-          error: result.error || "Invio fallito",
-          message: messaggio,
-        });
-      }
+    Il tuo feedback ci aiuta a crescere e a offrire sempre il meglio 🙏`;
 
-      const log = `[${new Date().toISOString()}] [RECENSIONE] TO: ${num}\n${messaggio}\n\n`;
-      fs.appendFileSync("log_recensioni.txt", log);
+    // Manda in coda
+    await safeSendMessage(num, messaggio);
 
-      return res.json({ ok: true, sentAt: new Date().toISOString() });
-    } catch (err) {
-      const log = `[${new Date().toISOString()}] [RECENSIONE FALLITA] TO: ${num}\n${
-        err.message
-      }\n\n`;
-      fs.appendFileSync("log_recensioni.txt", log);
+    // Log su file
+    const log = `[${new Date().toISOString()}] [RECENSIONE QUEUED] TO: ${num}\n${messaggio}\n\n`;
+    fs.appendFileSync("log_recensioni.txt", log);
 
-      return res.json({
-        ok: false,
-        error: "Serve chat attiva",
-        message: messaggio,
-      });
-    }
+    return res.json({ ok: true, queuedAt: new Date().toISOString() });
   } catch (err) {
     console.error("❌ Errore invio recensione WA:", err);
     const log = `[${new Date().toISOString()}] [ERRORE RECENSIONE] TO: ${numero}\n${

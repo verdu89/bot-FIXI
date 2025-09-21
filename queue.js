@@ -93,22 +93,40 @@ async function processQueue() {
       while (!success && attempts < 3) {
         attempts++;
         try {
-          await delay(Math.random() * 1200 + 800); // piccola attesa anti-ban
-          await client.sendMessage(item.to, item.message);
-          console.log(`✅ Messaggio inviato a ${item.to}`);
+          console.log(`📤 Tentativo ${attempts} invio a ${item.to}`);
 
-          // 🆕 Segna la chat come NON letta, così resta il pallino verde
+          // 🔎 Normalizza il numero con getNumberId
+          const rawNumber = item.to.replace("@c.us", "").replace("+", "");
+          console.log(`ℹ️ Normalizzo numero: ${rawNumber}`);
+
+          const wid = await client.getNumberId(rawNumber);
+
+          if (!wid) {
+            console.error(`❌ Numero ${rawNumber} NON è su WhatsApp`);
+            break; // esce dal retry loop
+          }
+
+          console.log(`✅ Numero valido: ${wid._serialized}`);
+
+          // ⏱️ Piccola attesa anti-ban
+          await delay(Math.random() * 1200 + 800);
+
+          // 📩 Invio messaggio
+          await client.sendMessage(wid._serialized, item.message);
+          console.log(`✅ Messaggio inviato a ${wid._serialized}`);
+
+          // 🆕 Segna la chat come NON letta (pallino verde)
           try {
-            const chat = await client.getChatById(item.to);
+            const chat = await client.getChatById(wid._serialized);
             if (chat) {
               await chat.markUnread();
               console.log(
-                `📍 Chat con ${item.to} segnata come NON letta dopo risposta bot`
+                `📍 Chat con ${wid._serialized} segnata come NON letta dopo risposta bot`
               );
             }
           } catch (e) {
             console.warn(
-              `⚠️ Impossibile marcare come NON letta la chat con ${item.to}:`,
+              `⚠️ Impossibile marcare come NON letta la chat con ${wid._serialized}:`,
               e.message
             );
           }
@@ -119,6 +137,7 @@ async function processQueue() {
           console.error(
             `❌ Errore invio a ${item.to} (tentativo ${attempts}): ${err.message}`
           );
+
           if (
             /Session closed|Target closed|Execution context was destroyed/i.test(
               err.message

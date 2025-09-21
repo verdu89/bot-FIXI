@@ -19,3 +19,5 @@ log_ia_full.txt
 log_recensioni.txt
 
 session/
+
+.wwebjs_cache/

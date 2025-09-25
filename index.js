@@ -1,5 +1,5 @@
 require("dotenv").config();
-const fs = require("fs"); // 🆕 per log su file
+const fs = require("fs");
 const { client } = require("./client");
 const { initQueue, safeSendMessage } = require("./queue");
 const { isOrarioLavorativo } = require("./utils/dateUtils");
@@ -12,18 +12,23 @@ const {
   rispostaIA,
   spiegaDomandaIA,
 } = require("./ai-utils");
-const { app, chatManuale } = require("./api");
+const { app } = require("./api");
 
-// 🆕 soglia max età messaggi sincronizzati (default 5 minuti)
+// ✅ importa lo stato condiviso
+const {
+  chatManuale,
+  ultimaAttivita,
+  haRicevutoCortesia,
+  utentiInAttesa,
+} = require("./state");
+
+// 🆕 soglia max età messaggi sincronizzati (default 1 minuto)
 const SYNC_OLD_MSG_MAX_AGE_MS = parseInt(
   process.env.SYNC_OLD_MSG_MAX_AGE_MS || "60000",
   10
 );
 
-// Stato runtime
-let utentiInAttesa = {};
-let ultimaAttivita = {};
-let haRicevutoCortesia = {};
+// Primo avvio → serve per filtrare i messaggi vecchi
 let primoAvvio = Date.now();
 
 // Messaggio di cortesia
@@ -41,6 +46,7 @@ client.on("message", async (msg) => {
     from: msg.from,
     body: msg.body,
     type: msg.type,
+    ts: msg.timestamp,
   });
 
   const from = msg.from;
@@ -51,13 +57,24 @@ client.on("message", async (msg) => {
     return;
   }
 
+  // 🆕 Ignora notifiche tecniche (quando elimini chat WhatsApp rimanda e2e_notification ecc.)
+  const tipiIgnorati = [
+    "e2e_notification",
+    "notification_template",
+    "ciphertext",
+  ];
+  if (tipiIgnorati.includes(msg.type)) {
+    console.log(`⚠️ Ignorato messaggio tecnico (${msg.type}) da ${from}`);
+    return;
+  }
+
   // Modalità manuale → FIXI non risponde
   if (chatManuale[from]) {
     console.log(`✋ Utente ${from} è in manuale → FIXI non interviene`);
     return;
   }
 
-  // 🆕 ⏱️ Guardia anti-sync: ignora messaggi RECEIVED troppo vecchi
+  // Calcola età messaggio
   const msgTsMs =
     typeof msg.timestamp === "number" ? msg.timestamp * 1000 : Date.now();
   const ageMs = Date.now() - msgTsMs;
@@ -78,17 +95,17 @@ client.on("message", async (msg) => {
     return;
   }
 
-  // 🆕 ⛔ Ignora se il messaggio è più vecchio del primo avvio del bot
-  if (msgTsMs < primoAvvio - 10000) {
+  // ⛔ Ignora TUTTI i messaggi con timestamp precedente al primo avvio
+  if (msgTsMs < primoAvvio) {
     console.log(
-      `⏱️ Ignoro messaggio con timestamp precedente al primo avvio: ${new Date(
+      `⏱️ Ignoro messaggio precedente al primo avvio da ${from}, ts=${new Date(
         msgTsMs
       ).toISOString()}`
     );
     return;
   }
 
-  // (spostato qui) aggiorna ultima attività SOLO per messaggi “freschi”
+  // aggiorna ultima attività SOLO per messaggi “freschi”
   ultimaAttivita[from] = Date.now();
 
   const body = msg.body?.trim().toLowerCase() || "";
@@ -121,8 +138,7 @@ client.on("message", async (msg) => {
 
   if (!utentiInAttesa[from]) {
     const messaggioValido = paroleChiave.some((p) => body.includes(p));
-    const tempoMessaggio = msg.timestamp * 1000;
-    if (messaggioValido && tempoMessaggio > primoAvvio - 10000) {
+    if (messaggioValido && msgTsMs > primoAvvio) {
       console.log(`📋 Attivazione menu per ${from}`);
       utentiInAttesa[from] = { fase: "menu" };
       return inviaMenuPrincipale(from);
@@ -182,47 +198,22 @@ client.on("message", async (msg) => {
   // --- Flusso preventivo ---
   if (utente?.fase === "preventivo") {
     const sessione = utentiInAttesa[from];
-
-    // Caso: sessione inesistente (già chiusa)
-    if (!sessione) {
-      const lower = msg.body.trim().toLowerCase();
-      if (lower === "ciao") {
-        console.log(
-          `👋 Utente ${from} ha scritto ciao → torno al menu principale.`
-        );
-        utentiInAttesa[from] = { fase: "menu" };
-        return inviaMenuPrincipale(from);
-      }
-      console.log(
-        `⚠️ Utente ${from} ha scritto dopo preventivo chiuso → solo reminder menu.`
-      );
-      return safeSendMessage(
-        from,
-        "👉 Scrivi *ciao* per tornare al menu principale."
-      );
-    }
-
-    // Caso: preventivo completato o step finiti
-    if (sessione.step >= domandePreventivo.length || sessione.completato) {
+    if (
+      !sessione ||
+      sessione.step >= domandePreventivo.length ||
+      sessione.completato
+    ) {
       delete utentiInAttesa[from];
       const lower = msg.body.trim().toLowerCase();
       if (lower === "ciao") {
-        console.log(
-          `👋 Utente ${from} ha scritto ciao → torno al menu principale.`
-        );
         utentiInAttesa[from] = { fase: "menu" };
         return inviaMenuPrincipale(from);
       }
-      console.log(
-        `⚠️ Utente ${from} ha scritto dopo preventivo completato → solo reminder menu.`
-      );
       return safeSendMessage(
         from,
         "👉 Scrivi *ciao* per tornare al menu principale."
       );
     }
-
-    // Caso normale: preventivo ancora in corso
     console.log(`📝 Gestione preventivo (step ${sessione.step}) per ${from}`);
     return gestisciPreventivo(
       msg,
@@ -236,47 +227,18 @@ client.on("message", async (msg) => {
   // --- Flusso assistenza ---
   if (utente?.fase === "assistenza") {
     const sessione = utentiInAttesa[from];
-
-    // Caso: sessione inesistente (già chiusa)
-    if (!sessione) {
-      const lower = msg.body.trim().toLowerCase();
-      if (lower === "ciao") {
-        console.log(
-          `👋 Utente ${from} ha scritto ciao → torno al menu principale.`
-        );
-        utentiInAttesa[from] = { fase: "menu" };
-        return inviaMenuPrincipale(from);
-      }
-      console.log(
-        `⚠️ Utente ${from} ha scritto dopo assistenza chiusa → solo reminder menu.`
-      );
-      return safeSendMessage(
-        from,
-        "👉 Scrivi *ciao* per tornare al menu principale."
-      );
-    }
-
-    // Caso: assistenza completata (già inviata al Google Sheet)
-    if (sessione.completato) {
+    if (!sessione || sessione.completato) {
       delete utentiInAttesa[from];
       const lower = msg.body.trim().toLowerCase();
       if (lower === "ciao") {
-        console.log(
-          `👋 Utente ${from} ha scritto ciao → torno al menu principale.`
-        );
         utentiInAttesa[from] = { fase: "menu" };
         return inviaMenuPrincipale(from);
       }
-      console.log(
-        `⚠️ Utente ${from} ha scritto dopo assistenza completata → solo reminder menu.`
-      );
       return safeSendMessage(
         from,
         "👉 Scrivi *ciao* per tornare al menu principale."
       );
     }
-
-    // Caso normale: assistenza ancora in corso
     console.log(`🛠️ Gestione assistenza (step ${sessione.step}) per ${from}`);
     return gestisciAssistenza(
       msg,
@@ -305,10 +267,8 @@ client.on("message_create", (msg) => {
 
 // Pulizia flag cortesia
 setInterval(() => {
-  console.log("♻️ Pulizia flag cortesia");
   for (const numero in haRicevutoCortesia) {
     if (Date.now() - haRicevutoCortesia[numero] > 7 * 24 * 60 * 60 * 1000) {
-      console.log(`🧹 Reset cortesia per ${numero}`);
       delete haRicevutoCortesia[numero];
     }
   }
@@ -322,7 +282,6 @@ setInterval(() => {
     if (chatManuale[numero]) continue;
     const inattivoDa = now - ultimaAttivita[numero];
     if (inattivoDa > 3 * 24 * 60 * 60 * 1000) {
-      console.log(`⌛ Timeout conversazione per ${numero} → pulizia memoria`);
       delete utentiInAttesa[numero];
       delete ultimaAttivita[numero];
     }

@@ -3,14 +3,14 @@ const bodyParser = require("body-parser");
 const { safeSendMessage, sendQueue } = require("./queue");
 const { getClientPronto } = require("./utils/statoBot");
 const fs = require("fs");
-const { haRicevutoCortesia } = require("./index");
+
+// ✅ importa lo stato condiviso
+const { chatManuale, haRicevutoCortesia } = require("./state");
 
 const app = express();
 app.use(bodyParser.json());
 
 // API per switch manuale/automatico
-const chatManuale = {}; // stato locale delle chat manuali
-
 app.post("/modalita-set", (req, res) => {
   const { numero, stato } = req.body;
   if (stato === "manuale") chatManuale[numero] = true;
@@ -40,7 +40,7 @@ app.post("/richiedi-recensione", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Numero mancante" });
     }
 
-    // 🔎 normalizza numero (usa la tua funzione o regex qui)
+    // 🔎 normalizza numero
     const { normalizzaNumero } = require("./flows/preventivo");
     const num = normalizzaNumero(numero);
 
@@ -80,7 +80,7 @@ app.post("/benvenuto", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Numero mancante" });
     }
 
-    // 🔎 normalizza numero (meglio spostarla in utils/phone.js, ma per ora va bene così)
+    // 🔎 normalizza numero
     const { normalizzaNumero } = require("./flows/preventivo");
     const num = normalizzaNumero(numero);
 
@@ -92,11 +92,8 @@ Il nostro team ti risponderà al più presto.`;
     // Manda in coda
     await safeSendMessage(num, messaggio);
 
-    // 🔒 segna che ha già ricevuto la cortesia → evita doppio messaggio
-    const { haRicevutoCortesia } = require("./index"); // importa l'oggetto che tieni in memoria
-    if (haRicevutoCortesia) {
-      haRicevutoCortesia[num] = Date.now();
-    }
+    // 🔒 segna subito la cortesia → evita doppio invio
+    haRicevutoCortesia[num] = Date.now();
 
     // Log su file
     const log = `[${new Date().toISOString()}] [BENVENUTO QUEUED] TO: ${num}\n${messaggio}\n\n`;

@@ -1,3 +1,4 @@
+const fs = require("fs");
 const { delay } = require("./utils/dateUtils");
 const { getClientPronto } = require("./utils/statoBot");
 
@@ -42,16 +43,27 @@ async function waitForConnected(maxMs = 30000) {
   return false;
 }
 
-// aggiunge un messaggio in coda
-async function safeSendMessage(to, message) {
+/**
+ * Aggiunge un messaggio in coda
+ * @param {string} to - numero destinatario
+ * @param {string} message - testo del messaggio
+ * @param {string} logFile - file di log su cui scrivere (es. log_recensioni.txt)
+ */
+async function safeSendMessage(to, message, logFile = "log_send.txt") {
   if (!to || typeof message !== "string" || message.trim() === "") {
     console.warn(
       `⚠️ safeSendMessage rifiutato: parametri non validi (to=${to})`
     );
     return;
   }
+
   // ⏱️ aggiungiamo il timestamp al messaggio
-  sendQueue.push({ to, message, timestamp: Date.now() });
+  sendQueue.push({ to, message, timestamp: Date.now(), logFile });
+
+  // log QUEUED
+  const logQueued = `[${new Date().toISOString()}] [QUEUED] TO: ${to}\n${message}\n\n`;
+  fs.appendFileSync(logFile, logQueued);
+
   console.log(`📨 In coda → ${to}. Lunghezza coda: ${sendQueue.length}`);
   if (!sending) processQueue();
 }
@@ -83,6 +95,10 @@ async function processQueue() {
             1000
           ).toFixed(0)}s) per ${item.to}`
         );
+        const logDrop = `[${new Date().toISOString()}] [DROPPED-OLD] TO: ${
+          item.to
+        }\n${item.message}\n\n`;
+        fs.appendFileSync(item.logFile, logDrop);
         sendQueue.shift();
         continue;
       }
@@ -103,6 +119,10 @@ async function processQueue() {
 
           if (!wid) {
             console.error(`❌ Numero ${rawNumber} NON è su WhatsApp`);
+            const logErr = `[${new Date().toISOString()}] [FAILED] Numero non WhatsApp → ${rawNumber}\n${
+              item.message
+            }\n\n`;
+            fs.appendFileSync(item.logFile, logErr);
             break; // esce dal retry loop
           }
 
@@ -114,6 +134,11 @@ async function processQueue() {
           // 📩 Invio messaggio
           await client.sendMessage(wid._serialized, item.message);
           console.log(`✅ Messaggio inviato a ${wid._serialized}`);
+
+          const logSent = `[${new Date().toISOString()}] [SENT] TO: ${
+            wid._serialized
+          }\n${item.message}\n\n`;
+          fs.appendFileSync(item.logFile, logSent);
 
           // 🆕 Segna la chat come NON letta (pallino verde)
           try {
@@ -138,6 +163,11 @@ async function processQueue() {
             `❌ Errore invio a ${item.to} (tentativo ${attempts}): ${err.message}`
           );
 
+          const logErr = `[${new Date().toISOString()}] [ERROR] TO: ${
+            item.to
+          } (tentativo ${attempts})\n${err.message}\n\n`;
+          fs.appendFileSync(item.logFile, logErr);
+
           if (
             /Session closed|Target closed|Execution context was destroyed/i.test(
               err.message
@@ -147,7 +177,7 @@ async function processQueue() {
               "💥 Sessione/Target chiuso durante l'invio. Attendo riconnessione..."
             );
             await delay(2500);
-            break; // esci dal retry loop, riproverà nel prossimo giro
+            break; // esci dal retry loop
           }
           await delay(1500); // backoff prima del retry
         }
@@ -158,6 +188,10 @@ async function processQueue() {
         console.error(
           `⚠️ Messaggio scartato dopo troppi tentativi: ${item.to}`
         );
+        const logDrop = `[${new Date().toISOString()}] [FAILED] TO: ${
+          item.to
+        }\n${item.message}\n\n`;
+        fs.appendFileSync(item.logFile, logDrop);
         sendQueue.shift();
       }
     }

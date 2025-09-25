@@ -84,10 +84,10 @@ app.post("/benvenuto", async (req, res) => {
     const { normalizzaNumero } = require("./flows/preventivo");
     const num = normalizzaNumero(numero);
 
-    const messaggio = `👋 Ciao ${
-      nome || ""
-    }, grazie per averci contattato per un preventivo! 
-Il nostro team ti risponderà al più presto.`;
+    const messaggio = `Grazie per averci contattato! Abbiamo ricevuto la tua richiesta e un nostro consulente ti ricontatterà al più presto per fornirti tutte le informazioni di cui hai bisogno.
+
+Nel frattempo, puoi esplorare la nostra gamma completa di prodotti sul nostro sito web: https://www.infissipvcsardegna.com/
+`;
 
     // Manda in coda
     await safeSendMessage(num, messaggio);

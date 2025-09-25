@@ -337,3 +337,8 @@ app.listen(PORT, "0.0.0.0", () => {
 
 // Avvio WhatsApp
 client.initialize();
+
+// variabili da esportare
+module.exports = {
+  haRicevutoCortesia,
+};

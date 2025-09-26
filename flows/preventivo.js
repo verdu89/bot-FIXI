@@ -19,7 +19,7 @@ const domandePreventivo = [
   "La tua *email*?",
   "In quale *provincia va effettuato il lavoro*?",
   "In quale *comune*?",
-  "Descrivi la richiesta con *misure orientative (larghezza x altezza)*.\nSe non le hai ancora, indica almeno a quale prodotto sei interessato.",
+  "Descrivi la richiesta con *misure orientative (larghezza x altezza)*.\nSe non le hai ancora, indica almeno a quale prodotto sei interessato. N.B. invia tutto in un unico messaggio",
 ];
 
 // 🔹 Gestione del flusso preventivo

@@ -35,7 +35,7 @@ let primoAvvio = Date.now();
 const MESSAGGIO_CORTESIA = `👋 Grazie per averci contattato.
 
 Siamo operativi in questo momento: un nostro operatore ti risponderà appena possibile.
-📞 Per urgenze, chiama il *070 247362*`;
+☎️ Per urgenze, chiama il *070 247362*`;
 
 // Init queue
 initQueue(client);
